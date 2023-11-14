@@ -4,6 +4,8 @@ import numpy as np
 
 np.random.seed(0)
 
+# =============================== Util ===============================
+
 
 def get_return(start_id, state_sq, gamma, rewards):
     """
@@ -32,6 +34,8 @@ def get_values(P: np.ndarray, r: np.ndarray, gamma):
     return np.linalg.inv(
         I - gamma * P
     ) @ r
+
+# ========================= Model Definition =========================
 
 
 # 状态转移矩阵 P
