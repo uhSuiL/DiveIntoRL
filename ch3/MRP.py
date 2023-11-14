@@ -11,8 +11,8 @@ def get_return(start_id, state_sq, gamma, rewards):
     返回第start_id的state的回报g
     """
     g = 0
-    for state_id in reversed(range(start_id, len(state_sq))):
-        g += gamma * rewards[state_id]
+    for state_id in reversed(state_sq):
+        g = g * gamma + rewards[state_id - 1]
     return g
 
 
