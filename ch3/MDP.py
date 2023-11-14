@@ -95,3 +95,10 @@ MRP = mdp2mrp(MDP, policy_1)
 print(MRP[1])
 print(MRP[2])
 
+# ================================ Solve ================================
+
+
+from MRP import get_values
+
+V = get_values(*MRP[1:])
+print("Values:\n", V)
