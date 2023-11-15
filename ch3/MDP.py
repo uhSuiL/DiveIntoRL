@@ -6,7 +6,7 @@ np.random.seed(0)
 
 # ========================= Model Definition =========================
 
-# 状态集
+# 状态集 s5为终止状态
 S = ["s1", "s2", "s3", "s4", "s5"]
 # 动作集
 A = ["保持s1", "前往s1", "前往s2", "前往s3", "前往s4", "前往s5", "概率前往"]
@@ -91,14 +91,15 @@ def mdp2mrp(MDP: tuple, policy: dict) -> tuple:
     return S, np.array(P_new), np.array(R_new), gamma
 
 
-MRP = mdp2mrp(MDP, policy_1)
-print(MRP[1])
-print(MRP[2])
+if __name__ == "__main__":
+    MRP = mdp2mrp(MDP, policy_1)
+    print(MRP[1])
+    print(MRP[2])
 
-# ================================ Solve ================================
+    # ================================ Solve ================================
 
 
-from MRP import get_values
+    from MRP import get_values
 
-V = get_values(*MRP[1:])
-print("Values:\n", V)
+    V = get_values(*MRP[1:])
+    print("Values:\n", V)
