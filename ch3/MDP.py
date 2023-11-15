@@ -65,7 +65,7 @@ policy_2 = {
 
 
 def mdp2mrp(MDP: tuple, policy: dict) -> tuple:
-    """将mdp问题转化为mrp问题
+    """将mdp问题转化为mrp问题--Marginalize
         对状态转移函数 P(s'|s, a) 关于a积分
         对奖励函数 R(s, a) 关于a积分
     """
@@ -97,8 +97,6 @@ if __name__ == "__main__":
     print(MRP[2])
 
     # ================================ Solve ================================
-
-
     from MRP import get_values
 
     V = get_values(*MRP[1:])
