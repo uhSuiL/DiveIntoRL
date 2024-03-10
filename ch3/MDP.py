@@ -1,6 +1,7 @@
 # Markov Decision Process (S, A, P, R, gamma)
-
+import pytest
 import numpy as np
+from ch3.MonteCarlo import sample
 
 np.random.seed(0)
 
@@ -89,6 +90,28 @@ def mdp2mrp(MDP: tuple, policy: dict) -> tuple:
         P_new.append(p_s)
 
     return S, np.array(P_new), np.array(R_new), gamma
+
+
+def occupancy_measure(state, action, episodes: list[list[tuple]], max_time_steps: int, gamma: float):
+    total_times = np.zeros(max_time_steps)  # 记录每个时间步t在所有episode中出现了几次
+    occur_times = np.zeros(max_time_steps)  # 记录每个时间步t的(state, action)的次数
+    for episode in episodes:
+        for t, (s_t, a_t, r_t) in enumerate(episode):
+            total_times[t] += 1
+            occur_times[t] += int((s_t, a_t) == (state, action))
+
+    rho = 0
+    for i in reversed(range(max_time_steps)):
+        if total_times[i] > 0:
+            rho += gamma**i * occur_times[i] / total_times[i]
+    return (1 - gamma) * rho
+
+
+def test_occupancy():
+    MAX_TIME_STEPS = 1000
+    episodes = sample(MDP, policy_1, terminate_state_id=4, num_episode=1000, max_time_step=MAX_TIME_STEPS)
+    occ1 = occupancy_measure('s4', '概率前往', episodes, max_time_steps=MAX_TIME_STEPS, gamma=0.5)
+    print(occ1)
 
 
 if __name__ == "__main__":
