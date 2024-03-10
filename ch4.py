@@ -50,7 +50,19 @@ class CliffWalkingEnv:
 		return actual_next_state == next_state
 
 
+def test_cliff_env():
+	ncol = 12
+	nrow = 4
+	cliff_env = CliffWalkingEnv(
+		ncol=ncol, nrow=nrow,
+		cliff_pos=[(x, 0) for x in range(1, ncol)],
+		end_pos=(ncol, 0)
+	)
+	print(cliff_env((0, 0), 'down'))
+
+
 class PolicyIteration:
+	# TODO: Seems to have bug since illegal results
 	def __init__(self, env, diff_threshold, gamma):
 		self.diff_threshold = diff_threshold
 		self.gamma = gamma
@@ -79,49 +91,36 @@ class PolicyIteration:
 			cnt += 1
 			if diff < self.diff_threshold:
 				break
-		print(f"evaluate_policy completes after {cnt} updates")
+		print(f"complete evaluate_policy in {cnt} updates")
+		return copy.deepcopy(self.pi)
 
 	def improve_policy(self):
-		# TODO: 这里取argmax应该是针对每个s而不是总的
-		Q = {
-			(s, a): self.env.reward(s, a) + self.gamma * sum(self.V_pi[s_] * self.env.P(s_, s, a) for s_ in self.env.state_space)
-			for s in self.env.state_space
-			for a in self.env.action_space
-		}
-		max_q = max(Q.values())
-		num_max_q = sum(q == max_q for q in Q.values())
-
+		Q = dict()
 		for s in self.env.state_space:
-			self.pi[s] = {
-				a: 1 / num_max_q if Q[(s, a)] == max_q else 0
+			Q[s] = {
+				a: self.env.reward(s, a) + self.gamma * sum(self.V_pi[s_] * self.env.P(s_, s, a) for s_ in self.env.state_space)
 				for a in self.env.action_space
 			}
-		print(f"complete improve policy, max_q={max_q}")
+			max_q_s = max(Q[s].values())
+			num_max_q_s = sum(Q[s][a] == max_q_s for a in self.env.action_space)
+
+			self.pi[s] = {
+				a: 1 / num_max_q_s if Q[s][a] == max_q_s else 0
+				for a in self.env.action_space
+			}
+		print(f"complete improve policy")
 
 	def iterate_policy(self):
 		print("start iterate")
 		while True:
-			self.evaluate_policy()
-			old_pi = copy.deepcopy(self.pi)
+			old_pi = self.evaluate_policy()
 			self.improve_policy()
 			if old_pi == self.pi:
 				break
+		print("complete iterate")
 
 
-def test_cliff_env():
-	ncol = 12
-	nrow = 4
-	cliff_env = CliffWalkingEnv(
-		ncol=ncol, nrow=nrow,
-		cliff_pos=[(x, 0) for x in range(1, ncol)],
-		end_pos=(ncol, 0)
-	)
-	print(cliff_env((0, 0), 'down'))
-
-
-def test_cliff_env_and_dp(theta = 0.001, gamma = 0.9):
-	ncol = 12
-	nrow = 4
+def test_policy_iteration(ncol = 12, nrow = 4, theta = 0.001, gamma = 0.9):
 	cliff_env = CliffWalkingEnv(
 		ncol=ncol, nrow=nrow,
 		cliff_pos=[(x, 0) for x in range(1, ncol)],
@@ -129,3 +128,63 @@ def test_cliff_env_and_dp(theta = 0.001, gamma = 0.9):
 	)
 	policy = PolicyIteration(cliff_env, diff_threshold=theta, gamma=gamma)
 	policy.iterate_policy()
+
+
+class ValueIteration:
+	# TODO: To be tested
+	def __init__(self, env, gamma, diff_threshold):
+		self.env = env
+		self.gamma = gamma
+		self.diff_threshold = diff_threshold
+
+		# 初始化V(s) for s in state_space
+		self.V = {s: 0 for s in env.state_space}
+		self.pi = dict()
+
+	def __call__(self):
+		print("start value iteration")
+		cnt = 0
+		while True:
+			diff = self.diff_threshold
+			V_old = copy.deepcopy(self.V)
+			for s in self.env.state_space:
+				self.V[s] = max(
+					self.env.reward(s, a) + self.gamma * sum(self.env.P(s_, s, a) * self.V[s_] for s_ in self.env.state_space)
+					for a in self.env.action_space
+				)
+				diff = max(diff, abs(V_old[s] - self.V[s]))
+
+			cnt += 1
+			if not cnt % 20:
+				print(f"{cnt} iteration, diff: {diff: .5f}")
+			if diff <= self.diff_threshold:
+				print(f"complete value iteration in {cnt} updates")
+				break
+
+		return self
+
+	def get_policy(self) -> dict:
+		Q = dict()
+		for s in self.env.state_space:
+			Q[s] = {
+				a: self.env.reward(s, a) + self.gamma * sum(self.env.P(s_, s, a) * self.V[s_] for s_ in self.env.state_space)
+				for a in self.env.action_space
+			}
+			max_q_sa = max(Q[s].values())
+			num_max_q_sa = sum(Q[s][a] == max_q_sa for a in self.env.action_space)
+
+			self.pi[s] = {
+				a: 1 / num_max_q_sa if Q[s][a] == max_q_sa else 0
+				for a in self.env.action_space
+			}
+		return self.pi
+
+
+def test_value_iteration(ncol = 12, nrow = 4, theta = 0.001, gamma = 0.9):
+	cliff_env = CliffWalkingEnv(
+		ncol=ncol, nrow=nrow,
+		cliff_pos=[(x, 0) for x in range(1, ncol)],
+		end_pos=(ncol, 0)
+	)
+	value_iter = ValueIteration(cliff_env, diff_threshold=theta, gamma=gamma)
+	value_iter().get_policy()
