@@ -87,11 +87,11 @@ class Sarsa:
 		"""Epsilon Greedy"""
 		p = np.random.uniform()
 		return (
-			self.Q_table.index[np.argmax(self.Q_table[state])] if p < self.epsilon
-			else self.Q_table.index[np.random.randint(len(self.env.action_space))]
+			self.Q_table.index[np.random.randint(len(self.env.action_space))] if p < self.epsilon
+			else self.Q_table.index[np.argmax(self.Q_table[state])]
 		)
 
-	def update(self, s, a, r, s_next, a_next):
+	def update_q(self, s, a, r, s_next, a_next):
 		td_error = r + self.gamma * self.Q_table[s_next][a_next] - self.Q_table[s][a]
 		self.Q_table[s][a] += self.alpha * td_error
 
@@ -104,7 +104,7 @@ class Sarsa:
 		while not self.env.done:
 			s_next, r = self.env.step(a)
 			a_next = self.policy(s_next)
-			self.update(s, a, r, s_next, a_next)
+			self.update_q(s, a, r, s_next, a_next)
 
 			s = s_next
 			a = a_next
@@ -116,6 +116,7 @@ class Sarsa:
 
 def test_sarsa(num_episode = 500, num_iter = 10):
 	returns = []
+
 	cliff_env = CliffWalkingEnv(ncol=12, nrow=4)
 	sarsa = Sarsa(cliff_env, alpha=0.1, gamma=0.9, epsilon=0.1)
 	for i in range(num_iter):
@@ -133,4 +134,3 @@ def test_sarsa(num_episode = 500, num_iter = 10):
 	plt.xlabel('Episodes')
 	plt.ylabel('Returns')
 	plt.show()
-	# TODO: no convergence
