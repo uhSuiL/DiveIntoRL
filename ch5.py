@@ -95,7 +95,7 @@ class Sarsa:
 		td_error = r + self.gamma * self.Q_table[s_next][a_next] - self.Q_table[s][a]
 		self.Q_table[s][a] += self.alpha * td_error
 
-	def train_episode(self):
+	def train_episode(self) -> float | int:
 		"""Play an episode to train the policy, update Q table"""
 		episode_return = 0
 
@@ -114,11 +114,11 @@ class Sarsa:
 		return episode_return
 
 
-def test_sarsa(num_episode = 500, num_iter = 10):
+def test_sarsa(num_episode = 500, num_iter = 10, SarsaModel = Sarsa):
 	returns = []
 
 	cliff_env = CliffWalkingEnv(ncol=12, nrow=4)
-	sarsa = Sarsa(cliff_env, alpha=0.1, gamma=0.9, epsilon=0.1)
+	sarsa = SarsaModel(cliff_env, alpha=0.1, gamma=0.9, epsilon=0.1)
 	for i in range(num_iter):
 		num_e = int(num_episode / num_iter)
 		with tqdm(total=num_e, desc=f'Iteration {i}: ') as pbar:
@@ -134,3 +134,41 @@ def test_sarsa(num_episode = 500, num_iter = 10):
 	plt.xlabel('Episodes')
 	plt.ylabel('Returns')
 	plt.show()
+
+
+class SarsaNStep(Sarsa):
+	def update_q(self, states, actions, rewards):
+		n_step = len(states)
+		G_t = sum(rewards[t] * self.gamma ** t for t in range(n_step)) + self.Q_table[states[-1], actions[-1]]
+		self.Q_table[states[0], actions[0]] += self.alpha * (G_t - self.Q_table[states[0]], actions[0])
+
+	def train_episode(self, n_step: int) -> float | int:
+		episodes_return = 0
+
+		s0 = self.env.reset().state
+		# TODO: 感觉这里列表数量的维护有问题
+		state_list = [s0]
+		action_list = [self.policy(s0)]
+		reward_list = []
+		while not self.env.done:
+			s_t, r_t = self.env.step(action_list[-1])
+			a_t_next = self.policy(s_t)
+
+			episodes_return += r_t
+
+			state_list.append(s_t)
+			action_list.append(a_t_next)
+			reward_list.append(r_t)
+
+			if len(state_list) == n_step + 1:
+				state_list.pop()
+				action_list.pop()
+				reward_list.pop()
+
+			self.update_q(state_list, action_list, reward_list)
+
+		return episodes_return
+
+
+def test_sarsa_nstep():
+	test_sarsa(SarsaModel=SarsaNStep)
