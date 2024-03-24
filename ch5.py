@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 
 class CliffWalkingEnv:
-	def __init__(self, ncol, nrow, start_pos = None, cliff_pos = None, end_pos = None):
+	def __init__(self, ncol, nrow, start_pos=None, cliff_pos=None, end_pos=None):
 		self.ncol = ncol
 		self.nrow = nrow
 		self.pos = (0, 0) if start_pos is None else start_pos  # 默认起点设置在左下角原点处
@@ -38,7 +38,7 @@ class CliffWalkingEnv:
 
 		return self.pos, -1  # 没有走入悬崖或终点, 则游戏继续并得到奖励-1
 
-	def reset(self, start_pos = None):
+	def reset(self, start_pos=None):
 		self.pos = (0, 0) if start_pos is None else start_pos  # 默认起点设置在左下角原点处
 		self.done = False
 		return self
@@ -79,8 +79,8 @@ class Sarsa:
 
 		self.Q_table = pd.DataFrame(
 			np.zeros((len(env.action_space), len(env.state_space))),
-			index = env.action_space.keys(),
-			columns = env.state_space,
+			index=env.action_space.keys(),
+			columns=env.state_space,
 		)
 
 	def policy(self, state):
@@ -114,16 +114,18 @@ class Sarsa:
 		return episode_return
 
 
-def test_sarsa(num_episode = 500, num_iter = 10, SarsaModel = Sarsa):
+def test_sarsa(num_episode=500, num_iter=10, sarsa_model=None):
 	returns = []
 
-	cliff_env = CliffWalkingEnv(ncol=12, nrow=4)
-	sarsa = SarsaModel(cliff_env, alpha=0.1, gamma=0.9, epsilon=0.1)
+	if sarsa_model is None:
+		cliff_env = CliffWalkingEnv(ncol=12, nrow=4)
+		sarsa_model = Sarsa(env=cliff_env, alpha=0.1, gamma=0.9, epsilon=0.1)
+
 	for i in range(num_iter):
 		num_e = int(num_episode / num_iter)
 		with tqdm(total=num_e, desc=f'Iteration {i}: ') as pbar:
 			for e in range(num_e):
-				e_return = sarsa.train_episode()
+				e_return = sarsa_model.train_episode()
 				returns.append(e_return)
 
 				if (e + 1) % 10 == 0:
@@ -137,38 +139,39 @@ def test_sarsa(num_episode = 500, num_iter = 10, SarsaModel = Sarsa):
 
 
 class SarsaNStep(Sarsa):
-	def update_q(self, states, actions, rewards):
-		n_step = len(states)
-		G_t = sum(rewards[t] * self.gamma ** t for t in range(n_step)) + self.Q_table[states[-1], actions[-1]]
-		self.Q_table[states[0], actions[0]] += self.alpha * (G_t - self.Q_table[states[0]], actions[0])
+	def __init__(self, n_step, env, alpha, gamma, epsilon):
+		super().__init__(env, alpha, gamma, epsilon)
+		self.n_step = n_step
 
-	def train_episode(self, n_step: int) -> float | int:
-		episodes_return = 0
+		self.states = []
+		self.actions = []
+		self.rewards = []
 
-		s0 = self.env.reset().state
-		# TODO: 感觉这里列表数量的维护有问题
-		state_list = [s0]
-		action_list = [self.policy(s0)]
-		reward_list = []
-		while not self.env.done:
-			s_t, r_t = self.env.step(action_list[-1])
-			a_t_next = self.policy(s_t)
+	def update_q(self, s, a, r, s_next, a_next):
+		self.states.append(s)
+		self.actions.append(a)
+		self.rewards.append(r)
 
-			episodes_return += r_t
+		if len(self.states) == self.n_step:
+			G = sum((self.gamma ** t) * self.rewards[t] for t in range(self.n_step)) + self.Q_table[s_next][a_next]
+			self.Q_table[self.states[0]][self.actions[0]] += self.alpha * (G - self.Q_table[self.states[0]][self.actions[0]])
 
-			state_list.append(s_t)
-			action_list.append(a_t_next)
-			reward_list.append(r_t)
+			if self.env.done:  # 如果交互结束，则将暂存的所有s, a也更新，然后清空暂存列表
+				for k in range(1, self.n_step):
+					G = sum((self.gamma ** (t - k)) * self.rewards[t] for t in range(k, self.n_step)) + self.Q_table[s_next][a_next]
+					self.Q_table[self.states[k]][self.actions[k]] += self.alpha * (G - self.Q_table[self.states[k]][self.actions[k]])
 
-			if len(state_list) == n_step + 1:
-				state_list.pop()
-				action_list.pop()
-				reward_list.pop()
+				self.states = []
+				self.actions = []
+				self.rewards = []
+				return None
 
-			self.update_q(state_list, action_list, reward_list)
+			self.states.pop(0)
+			self.actions.pop(0)
+			self.rewards.pop(0)
 
-		return episodes_return
 
-
-def test_sarsa_nstep():
-	test_sarsa(SarsaModel=SarsaNStep)
+def test_sarsa_n_step(num_episode=500, num_iter=10):
+	cliff_env = CliffWalkingEnv(ncol=12, nrow=4)
+	sarsa_model = SarsaNStep(n_step=5, env=cliff_env, alpha=0.1, gamma=0.9, epsilon=0.1)
+	test_sarsa(sarsa_model=sarsa_model)
