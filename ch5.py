@@ -74,8 +74,10 @@ class TemporalDifference:
 	def update_q(self, s, a, r, s_next, a_next):
 		raise NotImplementedError
 
-	def __init__(self, env, epsilon):
+	def __init__(self, env, alpha, gamma, epsilon):
 		self.env = env
+		self.alpha = alpha
+		self.gamma = gamma
 		self.epsilon = epsilon
 
 		self.Q_table = pd.DataFrame(
@@ -111,29 +113,14 @@ class TemporalDifference:
 		return episode_return
 
 
-class Sarsa(TemporalDifference):
-	def __init__(self, env, alpha, gamma, epsilon):
-		super().__init__(env, epsilon)
-		self.alpha = alpha
-		self.gamma = gamma
-
-	def update_q(self, s, a, r, s_next, a_next):
-		td_error = r + self.gamma * self.Q_table[s_next][a_next] - self.Q_table[s][a]
-		self.Q_table[s][a] += self.alpha * td_error
-
-
-def test_sarsa(num_episode=500, num_iter=10, sarsa_model=None):
+def run_plot_td(model: TemporalDifference, num_episode=500, num_iter=10):
 	returns = []
-
-	if sarsa_model is None:
-		cliff_env = CliffWalkingEnv(ncol=12, nrow=4)
-		sarsa_model = Sarsa(env=cliff_env, alpha=0.1, gamma=0.9, epsilon=0.1)
 
 	for i in range(num_iter):
 		num_e = int(num_episode / num_iter)
 		with tqdm(total=num_e, desc=f'Iteration {i}: ') as pbar:
 			for e in range(num_e):
-				e_return = sarsa_model.train_episode()
+				e_return = model.train_episode()
 				returns.append(e_return)
 
 				if (e + 1) % 10 == 0:
@@ -144,6 +131,18 @@ def test_sarsa(num_episode=500, num_iter=10, sarsa_model=None):
 	plt.xlabel('Episodes')
 	plt.ylabel('Returns')
 	plt.show()
+
+
+class Sarsa(TemporalDifference):
+	def update_q(self, s, a, r, s_next, a_next):
+		td_error = r + self.gamma * self.Q_table[s_next][a_next] - self.Q_table[s][a]
+		self.Q_table[s][a] += self.alpha * td_error
+
+
+def test_sarsa():
+	cliff_env = CliffWalkingEnv(ncol=12, nrow=4)
+	sarsa_model = Sarsa(env=cliff_env, alpha=0.1, gamma=0.9, epsilon=0.1)
+	run_plot_td(sarsa_model)
 
 
 class SarsaNStep(Sarsa):
@@ -179,7 +178,19 @@ class SarsaNStep(Sarsa):
 			self.rewards.pop(0)
 
 
-def test_sarsa_n_step(num_episode=500, num_iter=10):
+def test_sarsa_n_step():
 	cliff_env = CliffWalkingEnv(ncol=12, nrow=4)
 	sarsa_model = SarsaNStep(n_step=5, env=cliff_env, alpha=0.1, gamma=0.9, epsilon=0.1)
-	test_sarsa(sarsa_model=sarsa_model)
+	run_plot_td(model=sarsa_model)
+
+
+class QLearning(TemporalDifference):
+	def update_q(self, s, a, r, s_next, a_next):
+		self.Q_table[s][a] += self.alpha * (r + self.gamma * self.Q_table[s_next].max() - self.Q_table[s][a])
+
+
+def test_q_learning():
+	cliff_env = CliffWalkingEnv(ncol=12, nrow=4)
+	q_learning = QLearning(cliff_env, alpha=0.1, gamma=0.9, epsilon=0.1)
+	run_plot_td(q_learning)
+
