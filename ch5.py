@@ -70,11 +70,12 @@ def test_cliff_env_cliff_space(nrow=4, ncol=12):
 	print(cliff_env.step('down'), cliff_env.done)
 
 
-class Sarsa:
-	def __init__(self, env, alpha, gamma, epsilon):
+class TemporalDifference:
+	def update_q(self, s, a, r, s_next, a_next):
+		raise NotImplementedError
+
+	def __init__(self, env, epsilon):
 		self.env = env
-		self.alpha = alpha
-		self.gamma = gamma
 		self.epsilon = epsilon
 
 		self.Q_table = pd.DataFrame(
@@ -90,10 +91,6 @@ class Sarsa:
 			self.Q_table.index[np.random.randint(len(self.env.action_space))] if p < self.epsilon
 			else self.Q_table.index[np.argmax(self.Q_table[state])]
 		)
-
-	def update_q(self, s, a, r, s_next, a_next):
-		td_error = r + self.gamma * self.Q_table[s_next][a_next] - self.Q_table[s][a]
-		self.Q_table[s][a] += self.alpha * td_error
 
 	def train_episode(self) -> float | int:
 		"""Play an episode to train the policy, update Q table"""
@@ -112,6 +109,17 @@ class Sarsa:
 			episode_return += r
 
 		return episode_return
+
+
+class Sarsa(TemporalDifference):
+	def __init__(self, env, alpha, gamma, epsilon):
+		super().__init__(env, epsilon)
+		self.alpha = alpha
+		self.gamma = gamma
+
+	def update_q(self, s, a, r, s_next, a_next):
+		td_error = r + self.gamma * self.Q_table[s_next][a_next] - self.Q_table[s][a]
+		self.Q_table[s][a] += self.alpha * td_error
 
 
 def test_sarsa(num_episode=500, num_iter=10, sarsa_model=None):
