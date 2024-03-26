@@ -23,12 +23,10 @@ class Qnet:
 		self.num_action = num_action
 		self.device = device
 
-	def __call__(self, *args, **kwargs):
+	def __call__(self, *args, **kwargs) -> nn.Module:
 		layers = [nn.Linear(self.num_state, self.hidden[0])]
 		for i in range(len(self.hidden) - 1):
 			layers.append(nn.Linear(self.hidden[i], self.hidden[i + 1]))
 		layers.append(nn.Linear(self.hidden[-1], self.num_action))
 
 		return nn.Sequential(*layers).to(self.device)
-
-
