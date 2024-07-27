@@ -2,3 +2,8 @@
 
 *.pkl
 out/
+
+*.png
+*.ipynb
+
+*_official.*
