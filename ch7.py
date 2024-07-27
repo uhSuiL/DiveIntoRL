@@ -68,22 +68,28 @@ class DQN:
 			assert type(action_id) is int
 			return action_id
 
-	def update_qnet(self, batch_s, batch_a, batch_r, batch_s_, batch_done):
+	def q_values(self, s, a):
+		values = self.qnet(s)
+		values = values.gather(dim=-1, index=a)
+		return values
 
+	def q_targets(self, r, s_, done):
+		next_values = self.target_qnet(s_) * (1 - done)  # done了, 动作价值就为0; (batch_size, action_dim)
+		max_next_values, _ = next_values.max(dim=-1, keepdim=True)
+		targets = r + self.gam * max_next_values
+		return targets
+
+	def update_qnet(self, batch_s, batch_a, batch_r, batch_s_, batch_done):
 		batch_s = th.tensor(batch_s, dtype=th.float).to(self.device)  # shape: (batch_size, state_dim)
 		batch_a = th.tensor(batch_a, dtype=th.int64).unsqueeze(dim=-1).to(self.device)
 		batch_r = th.tensor(batch_r, dtype=th.float).unsqueeze(dim=-1).to(self.device)
 		batch_s_ = th.tensor(batch_s_, dtype=th.float).to(self.device)  # shape: (batch_size, state_dim)
 		batch_done = th.tensor(batch_done, dtype=th.float).unsqueeze(dim=-1).to(self.device)
 
-		q_values = self.qnet(batch_s)
-		q_values = q_values.gather(dim=-1, index=batch_a)
-
-		next_q_values = self.target_qnet(batch_s_) * (1 - batch_done)  # done了, 动作价值就为0; (batch_size, action_dim)
-		max_next_q_values, _ = next_q_values.max(dim=-1, keepdim=True)
-		q_targets = batch_r + self.gam * max_next_q_values
-
-		loss = self.loss_fn(q_values, q_targets)
+		loss = self.loss_fn(
+			self.q_values(batch_s, batch_a),
+			self.q_targets(batch_r, batch_s_, batch_done),
+		)
 		self.optimizer.zero_grad()
 		loss.backward()
 		self.optimizer.step()
@@ -116,7 +122,7 @@ class DQN:
 		return episode_return
 
 
-def run_plot_dqn(env, replay_buffer, model, *, batch_size, num_episode, num_iter=10):
+def run_plot_dqn(env, replay_buffer, model, *, batch_size, num_episode, num_iter=10, name=None):
 	returns = []
 
 	for i in range(num_iter):
@@ -133,6 +139,7 @@ def run_plot_dqn(env, replay_buffer, model, *, batch_size, num_episode, num_iter
 	plt.plot(range(len(returns)), returns)
 	plt.xlabel('Episodes')
 	plt.ylabel('Returns')
+	plt.savefig(f'result_{name}.png')
 	plt.show()
 
 
@@ -169,4 +176,5 @@ if __name__ == '__main__':
 		dqn,
 		batch_size=64,
 		num_episode=500,
+		name='dqn'
 	)
