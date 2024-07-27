@@ -1,3 +1,4 @@
+import util
 import random
 import numpy as np
 import torch
@@ -23,27 +24,28 @@ class ReplayBuffer(deque):
 		return np.array(s_batch), a_batch, r_batch, np.array(s_next_batch), done_batch
 
 
-class Qnet:
-	def __init__(self, num_state: int, hidden_dims: list, action_dim: int, device: str):
-		self.num_state = num_state
-		self.hidden_dims = hidden_dims
-		self.num_action = action_dim
+@util.lazy_init
+class Qnet(nn.Module):
+	def __init__(self, num_state: int, hidden_dims: list, num_action: int, device: str):
+		super().__init__()
+		self.num_action = num_action
 		self.device = device
 
-	def __call__(self, *args, **kwargs) -> nn.Module:
-		layers = [nn.Linear(self.num_state, self.hidden_dims[0]), nn.ReLU()]
-		for i in range(len(self.hidden_dims) - 1):
-			layers += [nn.Linear(self.hidden_dims[i], self.hidden_dims[i + 1]), nn.ReLU()]
-		layers.append(nn.Linear(self.hidden_dims[-1], self.num_action))
+		layers = [nn.Linear(num_state, hidden_dims[0]), nn.ReLU()]
+		for i in range(len(hidden_dims) - 1):
+			layers += [nn.Linear(hidden_dims[i], hidden_dims[i + 1]), nn.ReLU()]
+		layers.append(nn.Linear(hidden_dims[-1], num_action))
 
-		return nn.Sequential(*layers).to(self.device)
+		self.net = nn.Sequential(*layers)
+
+		self.to(device)
+
+	def forward(self, state: th.tensor):
+		return self.net(state)
 
 
 class DQN:
 	def __init__(self, qnet: Qnet, *, learning_rate: float, epsilon: float, gamma: float, update_period: int):
-		self.num_action = qnet.num_action
-		self.device = qnet.device
-
 		self.qnet = qnet()
 		self.target_qnet = qnet()
 		self.optimizer = th.optim.Adam(self.qnet.parameters(), lr=learning_rate)
@@ -54,6 +56,9 @@ class DQN:
 		self.update_period = update_period  # 每隔多少步, 更新一次target_q_net
 
 		self.count_update = 0
+
+		self.num_action = self.qnet.num_action
+		self.device = self.qnet.device
 
 		assert self.qnet is not self.target_qnet
 
@@ -155,7 +160,7 @@ if __name__ == '__main__':
 	qnet = Qnet(
 		num_state=env.observation_space.shape[0],
 		hidden_dims=[128],
-		action_dim=env.action_space.n,
+		num_action=env.action_space.n,
 		device='cuda' if th.cuda.is_available() else 'cpu',
 	)
 	dqn = DQN(
