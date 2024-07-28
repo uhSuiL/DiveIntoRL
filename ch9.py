@@ -17,6 +17,10 @@ class Trajectory:
 		assert len(self.s) == len(self.a) == len(self.r) == len(self.s_) == len(self.done)
 		return len(self.s)
 
+	@property
+	def s_list(self):
+		return np.array(self.s)
+
 	def append(self, s, a, r, s_, done):
 		self.s.append(s)
 		self.a.append(a)
@@ -30,7 +34,7 @@ class PolicyNet(nn.Module):
 		super().__init__()
 		hidden_dims = [] if hidden_dims is None else hidden_dims
 		self.fc = util.MLP([state_dim, *hidden_dims, num_action])
-		self.softmax = nn.Softmax()
+		self.softmax = nn.Softmax(dim=-1)
 
 		self.to(device)
 		self.device = device
@@ -49,14 +53,14 @@ class REINFORCE:
 
 	@th.no_grad()
 	def policy(self, state):
-		state = th.tensor([state]).to(self.policy_net.device)
+		state = th.tensor(state).unsqueeze(dim=0).to(self.policy_net.device)
 		action_probs = self.policy_net(state)
 		action_dist = th.distributions.Categorical(action_probs)
 		action = action_dist.sample().item()
 		return action
 
 	def update(self, tau: Trajectory):
-		s_list = th.tensor(tau.s).to(self.policy_net.device)
+		s_list = th.tensor(tau.s_list).to(self.policy_net.device)
 		a_list = th.tensor(tau.a, dtype=th.long).to(self.policy_net.device)
 		r_list = th.tensor(tau.r).to(self.policy_net.device)
 
